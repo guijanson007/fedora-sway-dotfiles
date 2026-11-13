@@ -1,0 +1,6 @@
+[Unit]
+Description=Night Mode Scheduled Activation (8:00 PM)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/night-mode scheduled-activate

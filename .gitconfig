@@ -1,0 +1,7 @@
+[user]
+	email = guilhermejanson@gmail.com
+	name = guijanson007
+[init]
+	defaultBranch = main
+[url "git@github.com:"]
+	insteadOf = https://github.com/

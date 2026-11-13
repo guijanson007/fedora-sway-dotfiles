@@ -1,0 +1,31 @@
+# =========================================================
+# fzf
+# =========================================================
+
+export FZF_DEFAULT_COMMAND='fd --type f --hidden --no-ignore --strip-cwd-prefix'  # strip-cwd-prefix removes the leading ./ from results
+
+# Ctrl-T shows directories only.
+export FZF_CTRL_T_COMMAND='fd --type d --hidden --no-ignore --strip-cwd-prefix'
+
+# UI
+export FZF_DEFAULT_OPTS='
+  --height=60%
+  --layout=reverse
+  --border=rounded
+  --prompt="  "
+  --pointer="  "
+  --preview-window=right:65%:wrap:border-left
+'
+
+export _FZF_PREVIEW_CMD='bat --color=always --style=plain,numbers --line-range=:500 {}'
+export FZF_CTRL_T_OPTS="--preview '$_FZF_PREVIEW_CMD'"
+
+# Ctrl+F: file picker including hidden files
+_fzf_file() {
+  local result
+  result=$(fd --type f --hidden --no-ignore --strip-cwd-prefix | fzf --preview "$_FZF_PREVIEW_CMD") \
+    && LBUFFER+="$result"  # LBUFFER is the text left of the cursor
+  zle reset-prompt
+}
+zle -N _fzf_file
+zle -N _fzf_file_no_hidden

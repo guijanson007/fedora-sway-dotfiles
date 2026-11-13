@@ -1,0 +1,169 @@
+" ~/.ideavimrc — LazyVim-flavoured IdeaVim config for CLion
+" Reload after edits: :source ~/.ideavimrc
+" Find any action ID: :actionlist <pattern>   or   :set trackactionids  then trigger the action
+" NOTE: <Action>(...) mappings do NOT work with noremap — always use map/nmap/vmap for them.
+
+let mapleader=" "
+let maplocalleader="\\"
+
+" ---------- Options (LazyVim defaults) ----------
+set number relativenumber
+set scrolloff=4
+set sidescrolloff=8
+set ignorecase smartcase
+set incsearch hlsearch
+set clipboard+=unnamedplus
+set clipboard+=ideaput
+set showmode
+set visualbell
+set ideajoin                " J uses IDE smart join
+set ideaput
+set idearefactormode=keep
+set timeoutlen=500
+
+" ---------- Emulated plugins ----------
+set which-key               " needs the 'Which-Key' plugin from Marketplace
+set notimeout               " which-key waits for you instead of timing out
+set highlightedyank
+set commentary              " gcc / gc{motion}, same as LazyVim
+set surround                " ys/ds/cs (LazyVim uses gsa/gsd/gsr — remapped below)
+set mini-ai                 " mini.ai textobjects (aq, ab, ...)
+set argtextobj
+set textobj-entire
+set NERDTree
+set sneak                   " closest built-in thing to flash.nvim on s/S
+
+" ---------- Escape / basics ----------
+imap jk <Esc>
+nnoremap <Esc> :nohlsearch<CR><Esc>
+nmap <C-s> <Action>(SaveAll)
+imap <C-s> <Esc><Action>(SaveAll)
+
+" Move lines (LazyVim <A-j>/<A-k>)
+nmap <A-j> <Action>(MoveLineDown)
+nmap <A-k> <Action>(MoveLineUp)
+vmap <A-j> <Action>(MoveLineDown)
+vmap <A-k> <Action>(MoveLineUp)
+
+" Better indenting in visual mode
+vnoremap < <gv
+vnoremap > >gv
+
+" ---------- Windows ----------
+nnoremap <C-h> <C-w>h
+nnoremap <C-j> <C-w>j
+nnoremap <C-k> <C-w>k
+nnoremap <C-l> <C-w>l
+nnoremap <leader>- <C-w>s
+nnoremap <leader>\| <C-w>v
+nnoremap <leader>wd <C-w>c
+nmap <leader>wm <Action>(ToggleDistractionFreeMode)
+nmap <C-Up>    <Action>(StretchSplitToTop)
+nmap <C-Down>  <Action>(StretchSplitToBottom)
+nmap <C-Left>  <Action>(StretchSplitToLeft)
+nmap <C-Right> <Action>(StretchSplitToRight)
+
+" ---------- Buffers (tabs in CLion) ----------
+nmap H <Action>(PreviousTab)
+nmap L <Action>(NextTab)
+nmap [b <Action>(PreviousTab)
+nmap ]b <Action>(NextTab)
+nmap <leader>bd <Action>(CloseContent)
+nmap <leader>bo <Action>(CloseAllEditorsButActive)
+nmap <leader>bD <Action>(CloseAllEditors)
+nmap <leader>bp <Action>(PinActiveEditorTab)
+nmap <leader>bP <Action>(CloseAllUnpinnedEditors)
+nmap <leader>` <Action>(Switcher)
+nmap <leader>bb <Action>(Switcher)
+
+" ---------- Pickers (Telescope / snacks.picker equivalents) ----------
+nmap <leader><space> <Action>(GotoFile)
+nmap <leader>ff <Action>(GotoFile)
+nmap <leader>fr <Action>(RecentFiles)
+nmap <leader>fb <Action>(RecentFiles)
+nmap <leader>,  <Action>(RecentFiles)
+nmap <leader>/  <Action>(FindInPath)
+nmap <leader>sg <Action>(FindInPath)
+nmap <leader>sw <Action>(FindInPath)
+nmap <leader>sr <Action>(ReplaceInPath)
+nmap <leader>ss <Action>(FileStructurePopup)
+nmap <leader>sS <Action>(GotoSymbol)
+nmap <leader>sk <Action>(GotoAction)
+nmap <leader>sC <Action>(GotoAction)
+nmap <leader>:  <Action>(GotoAction)
+nmap <leader>sd <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>sm <Action>(ShowBookmarks)
+nmap <leader>fc :e ~/.ideavimrc<CR>
+nmap <leader>fn <Action>(NewElementSamePlace)
+
+" Optional: Fuzzier plugin gives a Telescope-style picker with live preview.
+" Install it, run :set trackactionids, trigger its finder once, then put the
+" reported IDs here (I haven't verified them, so they're left commented):
+" nmap <leader><space> <Action>(<fuzzier-file-finder-id>)
+" nmap <leader>/       <Action>(<fuzzier-grep-id>)
+
+" ---------- Diagnostics ----------
+nmap ]d <Action>(GotoNextError)
+nmap [d <Action>(GotoPreviousError)
+nmap ]e <Action>(GotoNextError)
+nmap [e <Action>(GotoPreviousError)
+nmap <leader>cd <Action>(ShowErrorDescription)
+nmap <leader>xx <Action>(ActivateProblemsViewToolWindow)
+nmap <leader>xX <Action>(ActivateProblemsViewToolWindow)
+
+" ---------- LSP-style code nav ----------
+nmap gd <Action>(GotoDeclaration)
+nmap gr <Action>(ShowUsages)
+nmap gI <Action>(GotoImplementation)
+nmap gy <Action>(GotoTypeDeclaration)
+nmap gD <Action>(GotoDeclaration)
+nmap K  <Action>(QuickJavaDoc)
+nmap gK <Action>(ParameterInfo)
+imap <C-k> <C-o><Action>(ParameterInfo)
+nmap ]] <Action>(GotoNextElementUnderCaretUsage)
+nmap [[ <Action>(GotoPrevElementUnderCaretUsage)
+nmap <C-o> <Action>(Back)
+nmap <C-i> <Action>(Forward)
+
+" ---------- Code actions ----------
+nmap <leader>ca <Action>(ShowIntentionActions)
+vmap <leader>ca <Action>(ShowIntentionActions)
+nmap <leader>cr <Action>(RenameElement)
+nmap <leader>cR <Action>(RenameFile)
+nmap <leader>cf <Action>(ReformatCode)
+vmap <leader>cf <Action>(ReformatCode)
+nmap <leader>co <Action>(OptimizeImports)
+nmap <leader>cs <Action>(ActivateStructureToolWindow)
+nmap <leader>ch <Action>(CIDR.Lang.SwitchHeaderSource)
+
+" ---------- Surround with LazyVim's mini.surround keys ----------
+nmap gsa ys
+vmap gsa S
+nmap gsd ds
+nmap gsr cs
+
+" ---------- Explorer / terminal / git ----------
+nmap <leader>e <Action>(ActivateProjectToolWindow)
+nmap <leader>E <Action>(SelectInProjectView)
+nmap <leader>ft <Action>(ActivateTerminalToolWindow)
+nmap <C-/> <Action>(ActivateTerminalToolWindow)
+nmap <leader>gg <Action>(ActivateCommitToolWindow)
+nmap <leader>gb <Action>(Annotate)
+nmap <leader>gl <Action>(Vcs.Show.Log)
+nmap <leader>gf <Action>(Vcs.ShowTabbedFileHistory)
+nmap ]h <Action>(VcsShowNextChangeMarker)
+nmap [h <Action>(VcsShowPrevChangeMarker)
+nmap <leader>ghr <Action>(Vcs.RollbackChangedLines)
+
+" ---------- Run / debug (LazyVim dap-ish) ----------
+nmap <leader>db <Action>(ToggleLineBreakpoint)
+nmap <leader>dc <Action>(Debug)
+nmap <leader>dr <Action>(Run)
+nmap <leader>dt <Action>(Stop)
+nmap <leader>cb <Action>(Build)
+
+" ---------- UI toggles ----------
+nmap <leader>uw <Action>(EditorToggleUseSoftWraps)
+nmap <leader>ul <Action>(EditorToggleShowLineNumbers)
+nmap <leader>uh <Action>(ToggleInlayHintsGloballyAction)
+nmap <leader>qq <Action>(Exit)

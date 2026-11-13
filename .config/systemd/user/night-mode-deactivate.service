@@ -1,0 +1,6 @@
+[Unit]
+Description=Night Mode Scheduled Deactivation (6:00 AM)
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/night-mode scheduled-deactivate

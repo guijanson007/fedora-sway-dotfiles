@@ -1,0 +1,17 @@
+[Default Applications]
+application/pdf=app.zen_browser.zen.desktop
+text/plain=app.zen_browser.zen.desktop
+text/html=app.zen_browser.zen.desktop
+x-scheme-handler/http=app.zen_browser.zen.desktop
+x-scheme-handler/https=app.zen_browser.zen.desktop
+x-scheme-handler/about=app.zen_browser.zen.desktop
+x-scheme-handler/unknown=app.zen_browser.zen.desktop
+x-scheme-handler/jetbrains=jetbrainsd.desktop
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+text/markdown=libreoffice-writer.desktop
+
+[Added Associations]
+application/pdf=leafpad.desktop;app.zen_browser.zen.desktop;
+text/plain=leafpad.desktop;footclient.desktop;foot.desktop;app.zen_browser.zen.desktop;
+image/png=imv.desktop;
+text/markdown=libreoffice-writer.desktop;

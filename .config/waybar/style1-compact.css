@@ -1,0 +1,17 @@
+@import url("style1.css");
+
+* {
+  font-size: 10pt;
+}
+
+#mode, #clock, #memory, #temperature, #cpu, #mpd,
+#idle_inhibitor, #backlight, #pulseaudio, #network, #battery,
+#custom-powermenu, #custom-cava-internal {
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#workspaces button {
+  padding-left: 3px;
+  padding-right: 3px;
+}
