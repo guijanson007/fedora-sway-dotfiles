@@ -159,6 +159,7 @@
     "tooltip": false
   },
   "idle_inhibitor": {
+    "start-activated": true,
     "format": "{icon}",
     "format-icons": {
       "activated": "󰅶",
