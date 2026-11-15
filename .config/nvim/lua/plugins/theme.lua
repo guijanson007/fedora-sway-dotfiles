@@ -1,0 +1,1 @@
+/home/guijanson/.local/state/desktop-theme/neovim.lua

@@ -12,21 +12,5 @@ return {
   { "rose-pine/neovim" },
   { "sainnhe/everforest" },
   { "shaunsingh/nord.nvim" },
-  {
-    "LazyVim/LazyVim",
-    opts = {
-      colorscheme = vim.fn.filereadable(vim.fn.expand("~/.local/state/desktop-theme/current")) == 1
-          and ({
-            catppuccin = "catppuccin",
-            ["catppuccin-latte"] = "catppuccin-latte",
-            everforest = "everforest",
-            gruvbox = "gruvbox",
-            kanagawa = "kanagawa",
-            nord = "nord",
-            ["rose-pine"] = "rose-pine",
-            ["tokyo-night"] = "tokyonight",
-          })[vim.fn.readfile(vim.fn.expand("~/.local/state/desktop-theme/current"))[1]]
-        or "catppuccin",
-    },
-  },
+  -- The active colorscheme is set by lua/plugins/theme.lua (symlink managed by theme-switcher).
 }

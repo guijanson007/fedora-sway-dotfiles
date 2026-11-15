@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Kept for the Super+Shift+Space binding: opens the theme carousel.
+exec "$HOME/.local/bin/theme-carousel" "$@"

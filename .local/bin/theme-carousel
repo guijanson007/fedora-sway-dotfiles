@@ -1,0 +1,281 @@
+#!/usr/bin/env python3
+"""Theme carousel overlay (GTK3 + gtk-layer-shell).
+
+Super+Ctrl+T opens it; pressing it again closes it.
+  Left/Right, h/l, Tab/Shift+Tab, scroll wheel : browse
+  Enter / Space / click on centre card         : apply theme
+  click on a side card                         : select it
+  Esc / q                                      : cancel (nothing changes)
+Hidden: `--script "right right left"` replays navigation (for testing).
+"""
+import fcntl
+import os
+import signal
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GtkLayerShell", "0.1")
+from gi.repository import GLib, Gdk, GdkPixbuf, Gtk, GtkLayerShell  # noqa: E402
+
+HOME = Path.home()
+THEMES = HOME / ".local/share/desktop-themes"
+SWITCHER = HOME / ".local/bin/theme-switcher"
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
+BASE_W = 1280  # decoded preview width; scaled down per card from this
+OFFSETS = (-2, -1, 0, 1, 2)
+WIDTH_FRAC = {0: 0.34, 1: 0.18, 2: 0.10}  # fraction of screen width per |offset|
+
+
+def single_instance():
+    lock = open(RUNTIME / "theme-carousel.lock", "a+")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:  # already open -> toggle it closed
+        lock.seek(0)
+        try:
+            os.kill(int(lock.read().strip()), signal.SIGTERM)
+        except (ValueError, OSError):
+            pass
+        sys.exit(0)
+    lock.truncate(0)
+    lock.write(str(os.getpid()))
+    lock.flush()
+    return lock
+
+
+def load_themes():
+    out = []
+    names = dict(l.split("|", 1) for l in
+                 subprocess.run([str(SWITCHER), "list"], capture_output=True, text=True).stdout.split("\n") if l)
+    for slug, name in names.items():
+        d = THEMES / slug
+        try:
+            with open(d / "colors.toml", "rb") as f:
+                c = tomllib.load(f)
+        except OSError:
+            continue
+        out.append({"slug": slug, "name": name, "preview": d / "preview.png",
+                    "accent": c.get("accent", "#ffffff"), "bg": c.get("background", "#000000"),
+                    "mode": c.get("mode", "dark")})
+    return out
+
+
+class Carousel(Gtk.Window):
+    def __init__(self, themes, current, script):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.themes = themes
+        self.n = len(themes)
+        self.idx = next((i for i, t in enumerate(themes) if t["slug"] == current), 0)
+        self.base = {}    # slug -> pixbuf at BASE_W
+        self.scaled = {}  # (slug, w) -> pixbuf
+        self.size = (0, 0)
+        self.result = None
+
+        self.set_app_paintable(True)
+        vis = self.get_screen().get_rgba_visual()
+        if vis:
+            self.set_visual(vis)
+        GtkLayerShell.init_for_window(self)
+        GtkLayerShell.set_namespace(self, "theme-carousel")
+        GtkLayerShell.set_layer(self, GtkLayerShell.Layer.OVERLAY)
+        GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.EXCLUSIVE)
+        GtkLayerShell.set_exclusive_zone(self, -1)
+        for edge in (GtkLayerShell.Edge.TOP, GtkLayerShell.Edge.BOTTOM,
+                     GtkLayerShell.Edge.LEFT, GtkLayerShell.Edge.RIGHT):
+            GtkLayerShell.set_anchor(self, edge, True)
+
+        self.css = Gtk.CssProvider()
+        Gtk.StyleContext.add_provider_for_screen(self.get_screen(), self.css,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        self.static_css = (b"window { background-color: transparent; }"
+                           b".card { border-radius: 14px; border: 4px solid transparent; }"
+                           b".dim { opacity: 0.45; }"
+                           b".dim2 { opacity: 0.22; }"
+                           b".hint { color: #9a9aa5; font-size: 13pt; }"
+                           b".count { color: #b5b5c0; font-size: 14pt; }")
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=26)
+        root.set_valign(Gtk.Align.CENTER)
+        root.set_halign(Gtk.Align.FILL)
+        self.row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=28)
+        self.row.set_halign(Gtk.Align.CENTER)
+        self.row.set_valign(Gtk.Align.CENTER)
+        self.cards = {}
+        for off in OFFSETS:
+            img = Gtk.Image()
+            ev = Gtk.EventBox()
+            ev.set_visible_window(False)
+            ev.add(img)
+            ev.connect("button-press-event", self.on_card_click, off)
+            img.get_style_context().add_class("card")
+            self.row.pack_start(ev, False, False, 0)
+            self.cards[off] = img
+        self.name = Gtk.Label()
+        self.count = Gtk.Label()
+        self.count.get_style_context().add_class("count")
+        hint = Gtk.Label(label="←/→ browse    Enter apply    Esc cancel")
+        hint.get_style_context().add_class("hint")
+        for w in (self.row, self.name, self.count, hint):
+            root.pack_start(w, False, False, 0)
+        self.add(root)
+
+        self.connect("draw", self.on_draw)
+        self.connect("key-press-event", self.on_key)
+        self.connect("scroll-event", self.on_scroll)
+        self.add_events(Gdk.EventMask.SCROLL_MASK | Gdk.EventMask.SMOOTH_SCROLL_MASK)
+        self.connect("size-allocate", self.on_size)
+        self.connect("destroy", lambda *_: Gtk.main_quit())
+        if script:
+            GLib.timeout_add(900, self.run_script, list(script.split()))
+
+    def on_draw(self, _w, cr):
+        cr.set_source_rgba(0.03, 0.03, 0.05, 0.94)  # backdrop (CSS alpha is unreliable on layer surfaces)
+        cr.set_operator(1)  # cairo.OPERATOR_SOURCE
+        cr.paint()
+        cr.set_operator(2)  # OPERATOR_OVER for children
+        return False
+
+    # -- images --
+    def get_base(self, t):
+        if t["slug"] not in self.base:
+            try:
+                self.base[t["slug"]] = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                    str(t["preview"]), BASE_W, int(BASE_W * 9 / 16), True)
+            except GLib.Error:
+                self.base[t["slug"]] = None
+        return self.base[t["slug"]]
+
+    def get_scaled(self, t, w):
+        key = (t["slug"], w)
+        if key not in self.scaled:
+            pb = self.get_base(t)
+            if pb is None:
+                self.scaled[key] = None
+            else:
+                self.scaled[key] = pb.scale_simple(w, int(w * pb.get_height() / pb.get_width()),
+                                                   GdkPixbuf.InterpType.BILINEAR)
+        return self.scaled[key]
+
+    # -- rendering --
+    def on_size(self, _w, alloc):
+        if (alloc.width, alloc.height) != self.size and alloc.width > 200:
+            self.size = (alloc.width, alloc.height)
+            self.scaled.clear()
+            self.refresh()
+
+    def refresh(self):
+        W, H = self.size
+        if not W:
+            return
+        cur = self.themes[self.idx]
+        self.css.load_from_data(self.static_css + (
+            ".center { border-color: %s; }"
+            ".title { color: %s; font-size: 30pt; font-weight: bold; }" % (cur["accent"], cur["accent"])
+        ).encode())
+        for off, img in self.cards.items():
+            t = self.themes[(self.idx + off) % self.n]
+            avail_w = max(int(W * WIDTH_FRAC[abs(off)]), 160)
+            avail_w = min(avail_w, int((H * 0.55) * 16 / 9)) if off == 0 else avail_w
+            pb = self.get_scaled(t, avail_w)
+            if pb:
+                img.set_from_pixbuf(pb)
+            ctx = img.get_style_context()
+            for c in ("center", "dim", "dim2"):
+                ctx.remove_class(c)
+            ctx.add_class("center" if off == 0 else ("dim" if abs(off) == 1 else "dim2"))
+        self.name.set_markup('<span size="xx-large" weight="bold" foreground="%s">%s</span>'
+                             % (cur["accent"], GLib.markup_escape_text(cur["name"])))
+        self.count.set_text(f"{self.idx + 1} / {self.n}   ·   {cur['mode']}")
+        # warm neighbours lazily so browsing stays smooth
+        GLib.idle_add(self.warm, 0, priority=GLib.PRIORITY_LOW)
+
+    def warm(self, step):
+        # decode the whole set progressively in idle time, nearest first
+        order = sorted(range(self.n), key=lambda i: min((i - self.idx) % self.n, (self.idx - i) % self.n))
+        if step < len(order):
+            self.get_base(self.themes[order[step]])
+            GLib.idle_add(self.warm, step + 1, priority=GLib.PRIORITY_LOW)
+        return False
+
+    # -- input --
+    def move(self, d):
+        self.idx = (self.idx + d) % self.n
+        self.refresh()
+
+    def apply(self):
+        self.result = self.themes[self.idx]["slug"]
+        self.destroy()
+
+    def on_key(self, _w, ev):
+        k = Gdk.keyval_name(ev.keyval)
+        shift = bool(ev.state & Gdk.ModifierType.SHIFT_MASK)
+        if k in ("Right", "l", "j", "Down"):
+            self.move(1)
+        elif k in ("Left", "h", "k", "Up"):
+            self.move(-1)
+        elif k == "Tab":
+            self.move(-1 if shift else 1)
+        elif k == "ISO_Left_Tab":
+            self.move(-1)
+        elif k in ("Return", "KP_Enter", "space"):
+            self.apply()
+        elif k in ("Escape", "q"):
+            self.destroy()
+        elif k == "Home":
+            self.idx = 0
+            self.refresh()
+        elif k == "End":
+            self.idx = self.n - 1
+            self.refresh()
+        return True
+
+    def on_scroll(self, _w, ev):
+        if ev.direction in (Gdk.ScrollDirection.UP, Gdk.ScrollDirection.LEFT):
+            self.move(-1)
+        elif ev.direction in (Gdk.ScrollDirection.DOWN, Gdk.ScrollDirection.RIGHT):
+            self.move(1)
+        elif ev.direction == Gdk.ScrollDirection.SMOOTH:
+            if abs(ev.delta_y) + abs(ev.delta_x) > 0.5:
+                self.move(1 if (ev.delta_y + ev.delta_x) > 0 else -1)
+        return True
+
+    def on_card_click(self, _w, _ev, off):
+        if off == 0:
+            self.apply()
+        else:
+            self.move(off)
+        return True
+
+    def run_script(self, steps):
+        if steps:
+            s = steps.pop(0)
+            self.move(-1 if s == "left" else 1)
+            GLib.timeout_add(500, self.run_script, steps)
+        return False
+
+
+def main():
+    argv = sys.argv[1:]
+    script = argv[argv.index("--script") + 1] if "--script" in argv else None
+    lock = single_instance()  # noqa: F841  (kept alive for the process lifetime)
+    themes = load_themes()
+    if not themes:
+        sys.exit("no themes found in ~/.local/share/desktop-themes")
+    current = subprocess.run([str(SWITCHER), "current"], capture_output=True, text=True).stdout.strip()
+    win = Carousel(themes, current, script)
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: win.destroy() or False)
+    win.show_all()
+    Gtk.main()
+    if win.result:  # window is gone first, then apply detached
+        subprocess.Popen([str(SWITCHER), "apply", win.result], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+if __name__ == "__main__":
+    main()

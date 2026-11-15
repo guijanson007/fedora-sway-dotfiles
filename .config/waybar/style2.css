@@ -1,3 +1,5 @@
+@import url("theme.css");
+
 * {
   font-family: "JetBrainsMono Nerd Font";
   font-size: 11pt;
@@ -8,8 +10,8 @@
 }
 @keyframes blink_red {
   to {
-    background-color: rgb(242, 143, 173);
-    color: rgb(26, 24, 38);
+    background-color: @th_red;
+    color: @th_bg;
   }
 }
 .warning, .critical, .urgent {
@@ -31,7 +33,7 @@ window > box {
   margin-left: 5px;
   margin-right: 5px;
   margin-top: 5px;
-  background-color: rgb(30, 30, 46);
+  background-color: @th_bg;
 }
 #workspaces {
   padding-left: 0px;
@@ -44,26 +46,26 @@ window > box {
   padding-right: 6px;
 }
 #workspaces button.focused {
-  background-color: rgb(181, 232, 224);
-  color: rgb(26, 24, 38);
+  background-color: @th_accent;
+  color: @th_bg;
 }
 #workspaces button.urgent {
-  color: rgb(26, 24, 38);
+  color: @th_bg;
 }
 #workspaces button:hover {
-  background-color: rgb(248, 189, 150);
-  color: rgb(26, 24, 38);
+  background-color: @th_orange;
+  color: @th_bg;
 }
 tooltip {
-  background: rgb(48, 45, 65);
+  background: @th_pill;
 }
 tooltip label {
-  color: rgb(217, 224, 238);
+  color: @th_fg;
 }
 #custom-launcher {
   padding-left: 8px;
   padding-right: 6px;
-  color: rgb(201, 203, 255);
+  color: @th_accent;
 }
 #mode, #clock, #memory, #temperature,#cpu,#mpd, #idle_inhibitor, #temperature, #backlight, #pulseaudio, #network, #battery, #custom-powermenu, #custom-cava-internal {
   padding-left: 10px;
@@ -71,71 +73,71 @@ tooltip label {
 }
 /* #mode { */
 /* 	margin-left: 10px; */
-/* 	background-color: rgb(248, 189, 150); */
-/*     color: rgb(26, 24, 38); */
+/* 	background-color: @th_orange; */
+/*     color: @th_bg; */
 /* } */
 #memory {
-  color: rgb(181, 232, 224);
+  color: @th_cyan;
 }
 #cpu {
-  color: rgb(245, 194, 231);
+  color: @th_magenta;
 }
 #clock {
-  color: rgb(217, 224, 238);
+  color: @th_fg;
 }
 #idle_inhibitor {
-  color: rgb(221, 182, 242);
+  color: @th_accent;
 }
 #temperature {
-  color: rgb(150, 205, 251);
+  color: @th_blue;
 }
 #backlight {
-  color: rgb(248, 189, 150);
+  color: @th_orange;
 }
 #pulseaudio {
-  color: rgb(245, 224, 220);
+  color: @th_bright_fg;
 }
 #network {
-  color: #ABE9B3;
+  color: @th_green;
 }
 
 #network.disconnected {
-  color: rgb(255, 255, 255);
+  color: @th_fg;
 }
 #battery.charging, #battery.full, #battery.discharging, #battery.plugged, #battery.not-charging {
-  color: rgb(250, 227, 176);
+  color: @th_yellow;
 }
 #battery.critical:not(.charging) {
-  color: rgb(242, 143, 173);
+  color: @th_red;
 }
 #custom-powermenu {
-  color: rgb(242, 143, 173);
+  color: @th_red;
 }
 #tray {
   padding-right: 8px;
   padding-left: 10px;
 }
 #mpd.paused {
-  color: #414868;
+  color: @th_muted;
   font-style: italic;
 }
 #mpd.stopped {
   background: transparent;
 }
 #mpd {
-  color: #c0caf5;
+  color: @th_fg;
 }
 #custom-cava-internal{
   font-family: "Hack Nerd Font" ;
 }
 #custom-vpn {
-    color: #a9b1d6;
+    color: @th_light_fg;
 }
 
 #custom-vpn.connected {
-    color: #9ece6a; /* Green when connected */
+    color: @th_green; /* Green when connected */
 }
 
 #custom-vpn.disconnected {
-    color: #f7768e; /* Red when disconnected */
+    color: @th_red; /* Red when disconnected */
 }

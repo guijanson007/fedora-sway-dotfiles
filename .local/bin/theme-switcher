@@ -1,0 +1,356 @@
+#!/usr/bin/env python3
+"""Unified desktop theme switcher.
+
+Single source of truth: ~/.local/share/desktop-themes/<slug>/colors.toml (+ backgrounds/, neovim.lua,
+vscode.json, btop.theme).  Subcommands:
+
+  list              print "slug|Name", one per line (used by theme-menu)
+  current           print the active slug
+  apply SLUG        apply a theme everywhere, live, without `swaymsg reload`
+  next | prev       cycle through the themes
+  menu              open the carousel (theme-carousel)
+
+ANSI mapping used for terminal / btop (documented here once, reused everywhere):
+  dark themes : 0=lighter_background 7=light_foreground 8=muted 15=bright_foreground
+  light themes: 0=foreground         7=lighter_background 8=muted 15=background
+  1/9 red, 2/10 green, 3/11 yellow, 4/12 blue, 5/13 magenta, 6/14 cyan
+  Missing keys fall back: orange -> yellow, brown -> red, bright_X -> X.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+HOME = Path.home()
+THEMES = Path(os.environ.get("THEMES_DIR", HOME / ".local/share/desktop-themes"))
+STATE = Path(os.environ.get("XDG_STATE_HOME", HOME / ".local/state")) / "desktop-theme"
+CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "desktop-theme"
+CFG = HOME / ".config"
+IMG_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def themes():
+    out = []
+    for d in sorted(THEMES.iterdir()):
+        if (d / "colors.toml").is_file():
+            out.append((d.name, d.name.replace("-", " ").title()))
+    return out
+
+
+def current():
+    try:
+        return (STATE / "current").read_text().strip()
+    except OSError:
+        return ""
+
+
+class Palette:
+    def __init__(self, slug):
+        self.slug = slug
+        self.dir = THEMES / slug
+        with open(self.dir / "colors.toml", "rb") as f:
+            self.c = tomllib.load(f)
+        c = self.c
+        self.light = c.get("mode", "dark") == "light"
+        self.bg = c["background"]
+        self.fg = c["foreground"]
+        self.accent = c.get("accent", c.get("blue", self.fg))
+        self.muted = c.get("muted", c["dark_foreground"])
+        self.pill = c.get("lighter_background", self.bg)
+        self.dark_bg = c.get("dark_background", self.bg)
+        self.light_fg = c.get("light_foreground", self.fg)
+        self.bright_fg = c.get("bright_foreground", self.fg)
+        self.selection = c.get("selection", self.muted)
+        for k in ("red", "green", "yellow", "blue", "magenta", "cyan"):
+            setattr(self, k, c[k])
+        self.orange = c.get("orange", self.yellow)
+        self.brown = c.get("brown", self.red)
+
+    def bright(self, k):
+        return self.c.get("bright_" + k, self.c[k])
+
+    def ansi(self):
+        if self.light:
+            first, seventh, last = self.fg, self.pill, self.bg
+        else:
+            first, seventh, last = self.pill, self.light_fg, self.bright_fg
+        names = ["red", "green", "yellow", "blue", "magenta", "cyan"]
+        a = [first] + [self.c[n] for n in names] + [seventh]
+        b = [self.muted] + [self.bright(n) for n in names] + [last]
+        return a + b
+
+
+def run(*cmd, **kw):
+    kw.setdefault("stdout", subprocess.DEVNULL)
+    kw.setdefault("stderr", subprocess.DEVNULL)
+    try:
+        return subprocess.run(cmd, check=False, **kw)
+    except OSError:
+        return None
+
+
+def write(path, text):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(path)
+
+
+# --- wallpaper ---------------------------------------------------------------
+
+def pick_wallpaper(p):
+    bg_dir = p.dir / "backgrounds"
+    if not bg_dir.is_dir():
+        return None
+    files = sorted(f for f in bg_dir.iterdir() if f.is_file() and f.suffix.lower() in IMG_EXT)
+    if not files:
+        return None
+    src = files[0]
+    if src.suffix.lower() != ".webp":  # swaybg (gdk-pixbuf) has no webp loader here
+        return src
+    CACHE.mkdir(parents=True, exist_ok=True)
+    dst = CACHE / f"{p.slug}-{src.stem}.jpg"
+    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+        r = run("magick", str(src), "-resize", "3840x2160>", "-quality", "92", str(dst))
+        if r is None or r.returncode != 0 or not dst.exists():
+            print(f"warning: could not convert wallpaper {src}", file=sys.stderr)
+            return None
+    return dst
+
+
+# --- generators --------------------------------------------------------------
+
+def sway_lines(p, wall):
+    L = [
+        f"client.focused          {p.accent} {p.accent} {p.bg} {p.accent} {p.accent}",
+        f"client.unfocused        {p.bg} {p.bg} {p.fg} {p.bg} {p.bg}",
+        f"client.focused_inactive {p.bg} {p.bg} {p.fg} {p.bg} {p.bg}",
+        f"client.placeholder      {p.bg} {p.bg} {p.fg} {p.bg} {p.bg}",
+        f"client.urgent           {p.accent} {p.accent} {p.bg} {p.accent} {p.accent}",
+        f"client.background       {p.bg}",
+    ]
+    if wall:
+        L.append(f"output * bg {wall} fill")
+    return L
+
+
+def apply_sway(p, wall):
+    lines = sway_lines(p, wall)
+    write(CFG / "sway/theme.conf", "\n".join(lines) + "\n")
+    # Live: runtime commands instead of `swaymsg reload` (reload re-runs every exec_always).
+    for ln in lines:
+        run("swaymsg", ln)
+
+
+def apply_kitty(p):
+    a = p.ansi()
+    t = [
+        f"foreground {p.fg}", f"background {p.bg}", f"cursor {p.accent}",
+        f"cursor_text_color {p.bg}",
+        f"selection_foreground {p.bg}", f"selection_background {p.accent}",
+        f"active_border_color {p.accent}", f"inactive_border_color {p.muted}",
+        f"url_color {p.blue}",
+    ] + [f"color{i} {c}" for i, c in enumerate(a)]
+    write(CFG / "kitty/theme.conf", "\n".join(t) + "\n")
+    run("pkill", "-USR1", "-u", str(os.getuid()), "-x", "kitty")
+
+
+def apply_rofi(p):
+    write(CFG / "rofi/colors.rasi",
+          "* {\n  al: #00000000;\n  bg: %s;\n  se: %s;\n  fg: %s;\n  ac: %s;\n}\n"
+          % (p.bg, p.accent, p.fg, p.accent))
+
+
+def apply_mako(p):
+    f = CFG / "mako/config"
+    if not f.exists():
+        return
+    t = f.read_text()
+    rep = {
+        r"^(background-color=).*$": rf"\g<1>{p.bg}",
+        r"^(text-color=).*$": rf"\g<1>{p.fg}",
+        r"^(border-color=).*$": rf"\g<1>{p.accent}",
+        r"^(progress-color=over ).*$": rf"\g<1>{p.pill}",
+    }
+    for pat, new in rep.items():
+        t = re.sub(pat, new, t, flags=re.M)
+    # [urgency=high] section border -> red
+    t = re.sub(r"(\[urgency=high\][^\[]*?border-color=)\S+", rf"\g<1>{p.red}", t, flags=re.S)
+    write(f, t)
+    run("makoctl", "reload")
+
+
+def apply_waybar(p):
+    defs = {
+        "bg": p.bg, "fg": p.fg, "accent": p.accent, "muted": p.muted, "pill": p.pill,
+        "light_fg": p.light_fg, "bright_fg": p.bright_fg, "red": p.red, "green": p.green,
+        "yellow": p.yellow, "blue": p.blue, "magenta": p.magenta, "cyan": p.cyan,
+        "orange": p.orange,
+    }
+    write(CFG / "waybar/theme.css",
+          "".join(f"@define-color th_{k} {v};\n" for k, v in defs.items()))
+    # SIGUSR2 reload aborts waybar's tray module here (SIGABRT); relaunch instead.
+    launcher = CFG / "waybar/launch_waybar.sh"
+    if launcher.exists():
+        subprocess.Popen(["setsid", "-f", str(launcher)], stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def apply_btop(p):
+    src = p.dir / "btop.theme"
+    dst = CFG / "btop/themes/desktop-theme.theme"
+    if src.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+    else:
+        t = f'''theme[main_bg]="{p.bg}"
+theme[main_fg]="{p.fg}"
+theme[title]="{p.fg}"
+theme[hi_fg]="{p.accent}"
+theme[selected_bg]="{p.selection}"
+theme[selected_fg]="{p.fg}"
+theme[inactive_fg]="{p.muted}"
+theme[graph_text]="{p.fg}"
+theme[meter_bg]="{p.pill}"
+theme[proc_misc]="{p.accent}"
+theme[cpu_box]="{p.accent}"
+theme[mem_box]="{p.accent}"
+theme[net_box]="{p.accent}"
+theme[proc_box]="{p.accent}"
+theme[div_line]="{p.muted}"
+theme[temp_start]="{p.green}"
+theme[temp_mid]="{p.yellow}"
+theme[temp_end]="{p.red}"
+theme[cpu_start]="{p.green}"
+theme[cpu_mid]="{p.yellow}"
+theme[cpu_end]="{p.red}"
+theme[free_start]="{p.green}"
+theme[free_mid]="{p.green}"
+theme[free_end]="{p.green}"
+theme[cached_start]="{p.cyan}"
+theme[cached_mid]="{p.cyan}"
+theme[cached_end]="{p.cyan}"
+theme[available_start]="{p.blue}"
+theme[available_mid]="{p.blue}"
+theme[available_end]="{p.blue}"
+theme[used_start]="{p.yellow}"
+theme[used_mid]="{p.orange}"
+theme[used_end]="{p.red}"
+theme[download_start]="{p.blue}"
+theme[download_mid]="{p.cyan}"
+theme[download_end]="{p.green}"
+theme[upload_start]="{p.magenta}"
+theme[upload_mid]="{p.red}"
+theme[upload_end]="{p.orange}"
+'''
+        write(dst, t)
+    conf = CFG / "btop/btop.conf"
+    if conf.exists():
+        t = conf.read_text()
+        n = re.sub(r'^color_theme\s*=.*$', 'color_theme = "desktop-theme"', t, flags=re.M)
+        if n != t:
+            conf.write_text(n)
+    run("pkill", "-SIGUSR2", "-u", str(os.getuid()), "-x", "btop")
+
+
+def apply_nvim(p):
+    # lua/plugins/theme.lua is a static symlink to this file.
+    dst = STATE / "neovim.lua"
+    src = p.dir / "neovim.lua"
+    if src.exists():
+        shutil.copyfile(src, dst)
+    else:
+        cs = "catppuccin-latte" if p.light else "catppuccin-mocha"
+        write(dst, 'return {\n  { "catppuccin/nvim", name = "catppuccin", priority = 1000 },\n'
+                   '  { "LazyVim/LazyVim", opts = { colorscheme = "%s" } },\n}\n' % cs)
+
+
+def vscode_exts():
+    r = run("code", "--list-extensions", stdout=subprocess.PIPE, text=True)
+    return {l.strip().lower() for l in (r.stdout.splitlines() if r else [])}
+
+
+def apply_vscode(p):
+    vj = p.dir / "vscode.json"
+    settings = CFG / "Code/User/settings.json"
+    if not vj.exists() or not settings.exists():
+        return
+    meta = json.loads(vj.read_text())
+    ext = meta.get("extension", "").lower()
+    if ext and ext not in vscode_exts():
+        print(f"note: VS Code extension {meta.get('extension')} not installed; VS Code unchanged",
+              file=sys.stderr)
+        return
+    try:
+        s = json.loads(settings.read_text())
+    except ValueError:
+        print("note: VS Code settings.json is not strict JSON; skipped", file=sys.stderr)
+        return
+    s["workbench.colorTheme"] = meta["name"]
+    s.pop("workbench.colorCustomizations", None)  # stale overrides from the old switcher
+    write(settings, json.dumps(s, indent=4) + "\n")
+
+
+def apply_gtk(p):
+    if shutil.which("gsettings") is None:
+        return
+    ns = "org.gnome.desktop.interface"
+    if p.light:
+        run("gsettings", "set", ns, "color-scheme", "prefer-light")
+        run("gsettings", "set", ns, "gtk-theme", "Default")
+    else:
+        run("gsettings", "set", ns, "color-scheme", "prefer-dark")
+        run("gsettings", "set", ns, "gtk-theme", "Catppuccin")
+
+
+def apply_theme(slug):
+    if slug not in dict(themes()):
+        print(f"Unknown theme: {slug}", file=sys.stderr)
+        sys.exit(2)
+    p = Palette(slug)
+    STATE.mkdir(parents=True, exist_ok=True)
+    wall = pick_wallpaper(p)
+    steps = [
+        ("sway", lambda: apply_sway(p, wall)), ("kitty", lambda: apply_kitty(p)),
+        ("rofi", lambda: apply_rofi(p)), ("mako", lambda: apply_mako(p)),
+        ("waybar", lambda: apply_waybar(p)), ("btop", lambda: apply_btop(p)),
+        ("nvim", lambda: apply_nvim(p)), ("vscode", lambda: apply_vscode(p)),
+        ("gtk", lambda: apply_gtk(p)),
+    ]
+    for name, fn in steps:  # one broken target must not block the rest
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001
+            print(f"warning: {name}: {e}", file=sys.stderr)
+    write(STATE / "current", slug + "\n")
+    name = dict(themes())[slug]
+    run("notify-send", "-a", "theme-switcher", "Theme changed", name)
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else "menu"
+    if cmd == "list":
+        for slug, name in themes():
+            print(f"{slug}|{name}")
+    elif cmd == "current":
+        print(current())
+    elif cmd == "apply" and len(argv) == 3:
+        apply_theme(argv[2])
+    elif cmd in ("next", "prev"):
+        slugs = [s for s, _ in themes()]
+        i = slugs.index(current()) if current() in slugs else 0
+        apply_theme(slugs[(i + (1 if cmd == "next" else -1)) % len(slugs)])
+    elif cmd == "menu":
+        os.execv(str(HOME / ".local/bin/theme-carousel"), ["theme-carousel"])
+    else:
+        print(__doc__, file=sys.stderr)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv)

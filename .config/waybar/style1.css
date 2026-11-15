@@ -1,3 +1,5 @@
+@import url("theme.css");
+
 * {
   font-family: "Hack Nerd Font";
   font-size: 12pt;
@@ -7,34 +9,34 @@
   transition-duration: 0.5s;
 }
 window#waybar {
-  color: #c0caf5;
-  background-color: #24283b;
-  border-bottom: 1px solid #414868;
+  color: @th_fg;
+  background-color: @th_bg;
+  border-bottom: 1px solid @th_pill;
   transition-duration: 0.5s;
   transition-property: background-color;
 }
 #workspaces button {
-  background: #24283b;
-  color: #c0caf5;
-  border-bottom: 1px solid #414868;
+  background: @th_bg;
+  color: @th_fg;
+  border-bottom: 1px solid @th_pill;
   padding-top: 0px;
   padding-bottom: 0px;
   padding-left: 4px;
   padding-right: 4px;
 }
 #workspaces button.focused {
-  color: #c0caf5;
-  background: #414868;
+  color: @th_fg;
+  background: @th_pill;
 }
 #workspaces button.urgent {
-  color: #f7768e;
+  color: @th_red;
 }
 #workspaces button.persistent {
-  color: #414868;
+  color: @th_muted;
 }
 #workspaces button:hover {
-  color: #c0caf5;
-  background: #414868;
+  color: @th_fg;
+  background: @th_pill;
   box-shadow: inherit;
 }
 #clock,
@@ -54,22 +56,22 @@ window#waybar {
 #mode {
   margin: 0px 2px;   /* gaps between modules */
   padding: 0.2rem 0.6rem;
-  color: #c0caf5;
-  background: #24283b;
-  border-bottom: 1px solid #414868;
+  color: @th_fg;
+  background: @th_bg;
+  border-bottom: 1px solid @th_pill;
 }
 #mode,
 #tray {
   margin: 0 0 0 2px;
 }
 /* #mode { */
-/*   color: #24283b; */
-/*   background-color: #f7768e; */
+/*   color: @th_bg; */
+/*   background-color: @th_red; */
 /* } */
 @keyframes blink {
   to {
-    color: #c0caf5;
-    background-color: #24283b;
+    color: @th_fg;
+    background-color: @th_bg;
   }
 }
 #battery.critical:not(.charging) {
@@ -78,39 +80,39 @@ window#waybar {
   animation-timing-function: linear;
   animation-iteration-count: infinite;
   animation-direction: alternate;
-  color: #f7768e;
-  background-color: #24283b;
+  color: @th_red;
+  background-color: @th_bg;
 }
 #battery.charging {
-  color: #9ece6a;
-  background-color: #24283b;
+  color: @th_green;
+  background-color: @th_bg;
 }
 #mpd.paused {
-  color: #414868;
-  background-color: #24283b;
+  color: @th_muted;
+  background-color: @th_bg;
 }
 #mpd.stopped {
   background: transparent;
 }
 #custom-separator {
-  color: #414868;
-  background: #24283b;
-  border-bottom: 1px solid #414868;
+  color: @th_muted;
+  background: @th_bg;
+  border-bottom: 1px solid @th_pill;
 }
 #idle_inhibitor {
-  color:#B5E8E0;
+  color:@th_cyan;
 }
 #custom-cava-internal{
   font-family: "Hack Nerd Font" ;
 }
 #custom-vpn {
-    color: #a9b1d6;
+    color: @th_light_fg;
 }
 
 #custom-vpn.connected {
-    color: #9ece6a; /* Green when connected */
+    color: @th_green; /* Green when connected */
 }
 
 #custom-vpn.disconnected {
-    color: #f7768e; /* Red when disconnected */
+    color: @th_red; /* Red when disconnected */
 }

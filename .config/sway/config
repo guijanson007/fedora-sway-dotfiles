@@ -77,7 +77,8 @@ exec_always {
 exec --no-startup-id dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=sway
 
 # Dynamic Wallpaper Service
-exec_always --no-startup-id ~/.config/sway/dynamic_wallpaper.sh $
+# Disabled: conflicts with theme wallpapers (loops a missing folder, respawned on every reload)
+#exec_always --no-startup-id ~/.config/sway/dynamic_wallpaper.sh $
 # Autotiling service
 exec_always autotiling
 
@@ -149,6 +150,7 @@ bindsym $mod+Return exec $term
 bindsym $mod+Shift+Return exec $browser
 bindsym $mod+Space exec $menu
 bindsym $mod+Shift+Space exec ~/.local/bin/theme-menu
+bindsym $mod+Ctrl+t exec ~/.local/bin/theme-carousel
 bindsym $mod+W kill
 bindsym $mod+Shift+c reload
 bindsym $mod+Shift+e exec swaynag -t warning -m 'You pressed the exit shortcut. Do you really want to exit sway? This will end your Wayland session.' -B 'Yes, exit sway' 'swaymsg exit'
