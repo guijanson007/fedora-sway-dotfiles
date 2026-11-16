@@ -1,8 +1,12 @@
 #!/bin/bash
 
-for pid in $(pgrep -x waybar 2>/dev/null); do
-  kill "$pid"
+pkill -x waybar 2>/dev/null
+# Wait for old instances to exit so they don't fight over the tray (max ~3s)
+for _ in $(seq 30); do
+  pgrep -x waybar >/dev/null || break
+  sleep 0.1
 done
+pkill -9 -x waybar 2>/dev/null
 
 SDIR="$HOME/.config/waybar"
 STYLE="${1:-2}"
@@ -14,6 +18,15 @@ for i in /sys/class/hwmon/hwmon*/temp*_input; do
     fi
 done
 sed -i "/hwmon-path/c\ \ \ \ \"hwmon-path\": \"$HWMON_PATH\"," $SDIR/config1 && sed -i "/hwmon-path/c\ \ \ \ \"hwmon-path\": \"$HWMON_PATH\"," $SDIR/config2
+
+# Tray only on the main monitor (HDMI-A-2 if active, else the first output)
+OUTPUTS=$(swaymsg -t get_outputs -r 2>/dev/null |
+  jq -r '.[] | select(.active and (.non_desktop | not)) | [.name, .rect.width] | @tsv')
+if printf '%s\n' "$OUTPUTS" | cut -f1 | grep -qx 'HDMI-A-2'; then
+  TRAY_OUTPUT="HDMI-A-2"
+else
+  TRAY_OUTPUT=$(printf '%s\n' "$OUTPUTS" | head -n1 | cut -f1)
+fi
 
 while IFS=$'\t' read -r output width; do
   [ -n "$output" ] || continue
@@ -27,8 +40,8 @@ while IFS=$'\t' read -r output width; do
   safe_output="${output//[^[:alnum:]_.-]/_}"
   output_config="${XDG_RUNTIME_DIR:-/tmp}/waybar-${STYLE}-${safe_output}.jsonc"
   sed "2i\\  \"output\": [\"$output\"]," "$CONFIG" > "$output_config"
-  waybar -c "$output_config" -s "$style" &
-done < <(
-  swaymsg -t get_outputs -r 2>/dev/null |
-    jq -r '.[] | select(.active and (.non_desktop | not)) | [.name, .rect.width] | @tsv'
-)
+  if [ "$output" != "$TRAY_OUTPUT" ]; then
+    sed -i '/^[[:space:]]*"tray"[[:space:]]*$/d' "$output_config"
+  fi
+  waybar -c "$output_config" -s "$style" </dev/null &
+done <<< "$OUTPUTS"
