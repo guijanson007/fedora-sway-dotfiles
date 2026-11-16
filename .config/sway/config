@@ -70,7 +70,7 @@ set $gnome-schema org.gnome.desktop.interface
 exec_always {
     gsettings set $gnome-schema icon-theme 'Papirus-Dark'
     gsettings set $gnome-schema cursor-theme 'Catppuccin-cursor'
-    gsettings set $gnome-schema font-name 'JetBrains Mono Nerd Font 12'
+    gsettings set $gnome-schema font-name 'JetBrainsMono Nerd Font 12'
 }
 
 # Set XDG_CURRENT_DESKTOP for proper wayland support

@@ -308,6 +308,105 @@ def apply_gtk(p):
         run("gsettings", "set", ns, "gtk-theme", "Catppuccin")
 
 
+def apply_zed(p):
+    """Generate ~/.config/zed/themes/desktop-theme.json; Zed hot-reloads theme files."""
+    a = p.ansi()
+    alpha = lambda c, x: c + x
+    syn = lambda color, **kw: dict(color=color, font_style=kw.get("style"), font_weight=kw.get("weight"))
+    style = {
+        "background.appearance": "opaque",
+        "border": alpha(p.muted, "80"), "border.variant": alpha(p.muted, "40"),
+        "border.focused": p.accent, "border.selected": p.accent,
+        "border.transparent": "#00000000", "border.disabled": alpha(p.muted, "40"),
+        "elevated_surface.background": p.dark_bg, "surface.background": p.dark_bg,
+        "background": p.dark_bg,
+        "element.background": p.pill, "element.hover": alpha(p.selection, "99"),
+        "element.active": p.selection, "element.selected": p.selection,
+        "element.disabled": p.pill,
+        "drop_target.background": alpha(p.accent, "40"),
+        "ghost_element.background": "#00000000", "ghost_element.hover": alpha(p.selection, "80"),
+        "ghost_element.active": p.selection, "ghost_element.selected": p.selection,
+        "ghost_element.disabled": "#00000000",
+        "text": p.fg, "text.muted": p.muted, "text.placeholder": p.muted,
+        "text.disabled": alpha(p.muted, "99"), "text.accent": p.accent,
+        "icon": p.fg, "icon.muted": p.muted, "icon.disabled": alpha(p.muted, "99"),
+        "icon.placeholder": p.muted, "icon.accent": p.accent,
+        "status_bar.background": p.dark_bg, "title_bar.background": p.dark_bg,
+        "title_bar.inactive_background": p.dark_bg, "toolbar.background": p.bg,
+        "tab_bar.background": p.dark_bg, "tab.inactive_background": p.dark_bg,
+        "tab.active_background": p.bg, "search.match_background": alpha(p.yellow, "55"),
+        "panel.background": p.dark_bg, "panel.focused_border": p.accent,
+        "pane.focused_border": p.accent, "pane_group.border": alpha(p.muted, "80"),
+        "scrollbar.thumb.background": alpha(p.muted, "55"),
+        "scrollbar.thumb.hover_background": alpha(p.muted, "99"),
+        "scrollbar.thumb.border": "#00000000", "scrollbar.track.background": "#00000000",
+        "scrollbar.track.border": "#00000000",
+        "editor.foreground": p.fg, "editor.background": p.bg,
+        "editor.gutter.background": p.bg, "editor.subheader.background": p.dark_bg,
+        "editor.active_line.background": alpha(p.selection, "55"),
+        "editor.highlighted_line.background": alpha(p.selection, "55"),
+        "editor.line_number": p.muted, "editor.active_line_number": p.fg,
+        "editor.invisible": alpha(p.muted, "80"), "editor.wrap_guide": alpha(p.muted, "40"),
+        "editor.active_wrap_guide": alpha(p.muted, "80"),
+        "editor.indent_guide": alpha(p.muted, "40"), "editor.indent_guide_active": alpha(p.muted, "99"),
+        "editor.document_highlight.read_background": alpha(p.accent, "30"),
+        "editor.document_highlight.write_background": alpha(p.accent, "50"),
+        "editor.document_highlight.bracket_background": alpha(p.accent, "30"),
+        "terminal.background": p.bg, "terminal.foreground": p.fg,
+        "terminal.bright_foreground": p.bright_fg, "terminal.dim_foreground": p.muted,
+        "terminal.ansi.background": p.bg,
+        "link_text.hover": p.accent,
+        "conflict": p.yellow, "conflict.background": alpha(p.yellow, "20"), "conflict.border": p.yellow,
+        "created": p.green, "created.background": alpha(p.green, "20"), "created.border": p.green,
+        "deleted": p.red, "deleted.background": alpha(p.red, "20"), "deleted.border": p.red,
+        "modified": p.yellow, "modified.background": alpha(p.yellow, "20"), "modified.border": p.yellow,
+        "renamed": p.blue, "renamed.background": alpha(p.blue, "20"), "renamed.border": p.blue,
+        "error": p.red, "error.background": alpha(p.red, "20"), "error.border": p.red,
+        "warning": p.yellow, "warning.background": alpha(p.yellow, "20"), "warning.border": p.yellow,
+        "info": p.blue, "info.background": alpha(p.blue, "20"), "info.border": p.blue,
+        "hint": p.cyan, "hint.background": alpha(p.cyan, "20"), "hint.border": p.cyan,
+        "success": p.green, "success.background": alpha(p.green, "20"), "success.border": p.green,
+        "predictive": p.muted, "predictive.background": alpha(p.muted, "20"), "predictive.border": p.muted,
+        "hidden": p.muted, "hidden.background": alpha(p.muted, "20"), "hidden.border": p.muted,
+        "ignored": p.muted, "ignored.background": alpha(p.muted, "20"), "ignored.border": p.muted,
+        "unreachable": p.muted, "unreachable.background": alpha(p.muted, "20"), "unreachable.border": p.muted,
+        "accents": [p.accent, p.magenta, p.cyan, p.yellow, p.green, p.red],
+    }
+    names = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
+    for i, n in enumerate(names):
+        style[f"terminal.ansi.{n}"] = a[i]
+        style[f"terminal.ansi.bright_{n}"] = a[8 + i]
+        style[f"terminal.ansi.dim_{n}"] = alpha(a[i], "99")
+    style["players"] = [
+        {"cursor": c, "background": c, "selection": alpha(c, "40")}
+        for c in (p.accent, p.magenta, p.cyan, p.yellow, p.green, p.red, p.orange, p.blue)
+    ]
+    style["syntax"] = {
+        "attribute": syn(p.yellow), "boolean": syn(p.orange), "comment": syn(p.muted, style="italic"),
+        "comment.doc": syn(p.muted, style="italic"), "constant": syn(p.orange),
+        "constructor": syn(p.blue), "embedded": syn(p.fg), "emphasis": syn(p.accent, style="italic"),
+        "emphasis.strong": syn(p.accent, weight=700), "enum": syn(p.yellow),
+        "function": syn(p.blue), "hint": syn(p.cyan), "keyword": syn(p.magenta),
+        "label": syn(p.blue), "link_text": syn(p.blue), "link_uri": syn(p.cyan),
+        "number": syn(p.orange), "operator": syn(p.cyan), "preproc": syn(p.magenta),
+        "primary": syn(p.fg), "property": syn(p.red), "punctuation": syn(p.light_fg),
+        "punctuation.bracket": syn(p.light_fg), "punctuation.delimiter": syn(p.light_fg),
+        "punctuation.list_marker": syn(p.accent), "punctuation.special": syn(p.cyan),
+        "string": syn(p.green), "string.escape": syn(p.cyan), "string.regex": syn(p.cyan),
+        "string.special": syn(p.cyan), "string.special.symbol": syn(p.cyan),
+        "tag": syn(p.blue), "text.literal": syn(p.green), "title": syn(p.blue, weight=700),
+        "type": syn(p.yellow), "variable": syn(p.fg), "variable.special": syn(p.red),
+        "variant": syn(p.blue),
+    }
+    theme = {
+        "$schema": "https://zed.dev/schema/themes/v0.2.0.json",
+        "name": "Desktop Theme", "author": "theme-switcher",
+        "themes": [{"name": "Desktop Theme",
+                    "appearance": "light" if p.light else "dark", "style": style}],
+    }
+    write(CFG / "zed/themes/desktop-theme.json", json.dumps(theme, indent=2) + "\n")
+
+
 def apply_theme(slug):
     if slug not in dict(themes()):
         print(f"Unknown theme: {slug}", file=sys.stderr)
@@ -320,7 +419,7 @@ def apply_theme(slug):
         ("rofi", lambda: apply_rofi(p)), ("mako", lambda: apply_mako(p)),
         ("waybar", lambda: apply_waybar(p)), ("btop", lambda: apply_btop(p)),
         ("nvim", lambda: apply_nvim(p)), ("vscode", lambda: apply_vscode(p)),
-        ("gtk", lambda: apply_gtk(p)),
+        ("gtk", lambda: apply_gtk(p)), ("zed", lambda: apply_zed(p)),
     ]
     for name, fn in steps:  # one broken target must not block the rest
         try:

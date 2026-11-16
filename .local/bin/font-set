@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Single system font setting (modelled on omarchy-font-set).
+
+  font-set                 show the current font
+  font-set list            list installed monospace families
+  font-set "Family" [N]    apply a font family (and optionally a size) everywhere
+
+State: ~/.local/state/desktop-font ("Family|size").  Targets: fontconfig (monospace/sans/UI aliases),
+GTK (gsettings), kitty, sway, zed (UI + buffer font).  Fonts not covered: waybar and mako keep their own.
+"""
+import json, os, re, subprocess, sys
+from pathlib import Path
+
+HOME = Path.home()
+CFG = HOME / ".config"
+STATE = HOME / ".local/state/desktop-font"
+DEFAULT = ("JetBrainsMono Nerd Font", 12)
+
+
+def get():
+    try:
+        fam, size = STATE.read_text().strip().split("|")
+        return fam, int(size)
+    except (OSError, ValueError):
+        return DEFAULT
+
+
+def sub_file(path, pattern, repl):
+    path = Path(path)
+    if not path.exists():
+        return
+    t = path.read_text()
+    n = re.sub(pattern, repl, t, flags=re.M)
+    if n != t:
+        path.write_text(n)
+
+
+def installed(fam):
+    out = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout
+    return any(fam.lower() == f.strip().lower() for line in out.splitlines() for f in line.split(","))
+
+
+def apply(fam, size):
+    if not installed(fam):
+        sys.exit(f"font-set: '{fam}' is not installed (see `font-set list`)")
+    STATE.write_text(f"{fam}|{size}\n")
+    # fontconfig: every app that asks for monospace / sans / system-ui gets this family
+    fc = CFG / "fontconfig/fonts.conf"
+    fc.parent.mkdir(parents=True, exist_ok=True)
+    fc.write_text(
+        '<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">\n<fontconfig>\n'
+        + "".join(f'  <alias binding="same"><family>{g}</family><prefer><family>{fam}</family></prefer></alias>\n'
+                  for g in ("monospace", "sans-serif", "system-ui"))
+        + "</fontconfig>\n")
+    subprocess.run(["fc-cache"], capture_output=True)
+    # GTK
+    subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "font-name", f"{fam} {size}"], capture_output=True)
+    subprocess.run(["gsettings", "set", "org.gnome.desktop.interface", "monospace-font-name", f"{fam} {size}"], capture_output=True)
+    # sway (startup gsettings line + bar/title font)
+    sub_file(CFG / "sway/config", r"^(font pango:).*$", rf"\g<1>{fam} 10")
+    sub_file(CFG / "sway/config", r"(font-name ').*(')", rf"\g<1>{fam} {size}\g<2>")
+    # kitty
+    sub_file(CFG / "kitty/kitty.conf", r"^font_family .*$", f"font_family      {fam}")
+    subprocess.run(["pkill", "-USR1", "-u", str(os.getuid()), "-x", "kitty"], capture_output=True)
+    # zed (settings.json is JSONC; edit the two keys in place, add them if missing)
+    z = CFG / "zed/settings.json"
+    if z.exists():
+        t = z.read_text()
+        for key, val in (("ui_font_family", fam), ("buffer_font_family", fam)):
+            line = f'"{key}": {json.dumps(val)}'
+            if re.search(rf'"{key}"\s*:', t):
+                t = re.sub(rf'"{key}"\s*:\s*"[^"]*"', line, t)
+            else:
+                t = t.replace("{\n", "{\n  " + line + ",\n", 1)
+        z.write_text(t)
+    print(f"font: {fam} {size}")
+
+
+def main(a):
+    if len(a) == 1:
+        print("%s %d" % get())
+    elif a[1] == "list":
+        out = subprocess.run(["fc-list", ":spacing=mono", "family"], capture_output=True, text=True).stdout
+        print("\n".join(sorted({l.split(",")[0].strip() for l in out.splitlines()})))
+    else:
+        apply(a[1], int(a[2]) if len(a) > 2 else get()[1])
+
+
+main(sys.argv)

@@ -1,0 +1,69 @@
+// Zed settings (mirrors the LazyVim setup: see keymap.json for <leader> bindings)
+{
+  "buffer_font_family": "JetBrainsMono Nerd Font",
+  "ui_font_family": "JetBrainsMono Nerd Font",
+  "session": { "trust_all_worktrees": true },
+  "vim_mode": true,
+  "ui_font_size": 16,
+  "buffer_font_size": 15,
+
+  // Theme is generated from the global desktop theme by ~/.local/bin/theme-switcher
+  // (writes ~/.config/zed/themes/desktop-theme.json; Zed hot-reloads it).
+  "theme": "Desktop Theme",
+
+  // LazyVim-like editor defaults
+  "relative_line_numbers": "enabled",
+  "vertical_scroll_margin": 4,
+  "cursor_blink": false,
+  "format_on_save": "on",
+  "vim": {
+    "use_system_clipboard": "always", // clipboard=unnamedplus
+    "use_smartcase_find": true
+  },
+
+  // neo-tree is on the right in nvim
+  "project_panel": {
+    "dock": "right",
+    "hide_hidden": false,
+    "hide_gitignore": false
+  },
+
+  // which-key popup: shows available continuations after a partial key sequence (SPACE, ], g, ...)
+  "which_key": { "enabled": true, "delay_ms": 200 },
+
+  "edit_predictions": { "provider": "copilot" }, // lazyvim ai.copilot extra
+
+  "lsp": {
+    "clangd": {
+      "binary": {
+        "path": "/usr/bin/clangd",
+        "arguments": [
+          "--header-insertion=iwyu",
+          "--background-index",
+          "--clang-tidy",
+          "--completion-style=detailed",
+          "--experimental-modules-support"
+        ]
+      },
+      "initialization_options": { "completeUnimported": true }
+    }
+  },
+
+  "languages": {
+    // clang-format picks up the nearest .clang-format (falls back to ~/.clang-format
+    // for anything under $HOME), same as conform.nvim in LazyVim
+    "C": {
+      "formatter": { "external": { "command": "clang-format", "arguments": ["--assume-filename={buffer_path}"] } },
+      "tab_size": 4
+    },
+    "C++": {
+      "formatter": { "external": { "command": "clang-format", "arguments": ["--assume-filename={buffer_path}"] } },
+      "tab_size": 4
+    },
+    "Python": {
+      "language_servers": ["basedpyright", "ruff", "!pyright", "!ty", "!pylsp", "..."],
+      "formatter": { "language_server": { "name": "ruff" } },
+      "code_actions_on_format": { "source.organizeImports.ruff": true }
+    }
+  }
+}
