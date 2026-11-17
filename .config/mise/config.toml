@@ -1,0 +1,5 @@
+[tools]
+claude = "latest"
+go = "latest"
+python = "latest"
+rust = "latest"

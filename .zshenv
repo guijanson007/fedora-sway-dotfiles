@@ -29,6 +29,12 @@ export STARSHIP_CONFIG="$ZDOTDIR/starship.toml"
 # Personal binaries/scripts
 export PATH="$HOME/.local/bin:$PATH"
 
+# ---------- mise ----------
+# Shims make mise-managed tools (python, go, rust, claude) visible to
+# non-interactive shells, scripts and GUI apps. Interactive shells use
+# `mise activate` in .zshrc instead, which replaces the shims on PATH.
+export PATH="$XDG_DATA_HOME/mise/shims:$PATH"
+
 # ---------- ZDOTDIR ----------
 if [[ -z "$XDG_CONFIG_HOME" ]]
 then

@@ -105,5 +105,10 @@ if [[ -f "$ZDOTDIR/local.zsh" ]]; then
   source "$ZDOTDIR/local.zsh"
 fi
 
+# mise: runtime/tool version manager (python, go, rust, claude)
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi
+
 # User aliases and functions
 alias dot='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
