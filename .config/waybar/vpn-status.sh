@@ -17,7 +17,7 @@ mkdir -p "$CACHE_DIR"
 (
   flock -x 9
   if [ ! -s "$CACHE_FILE" ] || [ "$(find "$CACHE_FILE" -mmin +0.033 2>/dev/null)" ]; then
-    "$nordvpn" status 2>/dev/null > "$CACHE_FILE.tmp"
+    "$nordvpn" status 2>/dev/null 9>&- > "$CACHE_FILE.tmp"
     mv "$CACHE_FILE.tmp" "$CACHE_FILE"
   fi
   cat "$CACHE_FILE"
