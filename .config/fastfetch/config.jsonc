@@ -1,0 +1,109 @@
+// ┌──────────────────────────────────────────────────────────────────────┐
+// │  fastfetch · ThinkPad T490s · Fedora 44 Sway                         │
+// │                                                                      │
+// │  Every colour here is an ANSI palette slot (blue, magenta, green…),  │
+// │  never a hex value, so the whole thing re-skins itself whenever      │
+// │  `theme-switcher apply <slug>` rewrites kitty's theme.conf.          │
+// └──────────────────────────────────────────────────────────────────────┘
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+
+  // Fedora Sericea: the Sway spin's own tree logo.
+  "logo": {
+    "source": "Fedora-Sericea",
+    "color": { "1": "blue", "2": "cyan" },
+    "padding": { "top": 2, "left": 2, "right": 4 }
+  },
+
+  "display": {
+    "separator": "  ",
+    "color": { "keys": "blue", "title": "blue", "separator": "90" },
+    "key": { "width": 14 },
+    "brightColor": false,
+    "duration": { "abbreviation": true },
+    "freq": { "ndigits": 1 },
+    "size": { "ndigits": 1, "binaryPrefix": "IEC" },
+    // Fira-code style rounded progress bars (U+EE00-EE05, in every Nerd Font 3.x)
+    "bar": {
+      "width": 12,
+      "border": {
+        "left": "",
+        "leftElapsed": "",
+        "right": "",
+        "rightElapsed": ""
+      },
+      "char": { "total": "", "elapsed": "" },
+      "color": { "total": "90", "border": "90" }
+    },
+    "percent": {
+      "type": ["bar", "num", "bar-monochrome"],
+      "color": { "green": "green", "yellow": "yellow", "red": "red" }
+    }
+  },
+
+  "modules": [
+    // ── greeting ───────────────────────────────────────────────────────
+    {
+      "type": "command",
+      "key": " ",
+      "keyWidth": 1,
+      "shell": "/bin/sh",
+      "text": "h=$(date +%H); if [ $h -lt 5 ]; then g='still up'; i='󰖔'; elif [ $h -lt 12 ]; then g='good morning'; i='󰖜'; elif [ $h -lt 18 ]; then g='good afternoon'; i='󰖙'; else g='good evening'; i='󰖛'; fi; printf '%s  %s, %s' \"$i\" \"$g\" \"$USER\"",
+      "outputColor": "bold_white"
+    },
+    {
+      "type": "title",
+      "key": " ",
+      "keyWidth": 1,
+      "format": "{#90}   {user-name}{#90}@{#blue}{host-name}"
+    },
+    "break",
+
+    // ── system ─────────────────────────────────────────────────────────
+    { "type": "custom", "format": "{#blue}╭─ {#bold_blue}󰣛  system {#blue}──────────────────────────────────" },
+    { "type": "os",       "key": "│ {#blue}  distro",  "format": "{pretty-name}" },
+    { "type": "kernel",   "key": "│ {#blue}  kernel",  "format": "{release}" },
+    { "type": "wm",       "key": "│ {#blue}󰕴  wm",      "format": "{pretty-name} {version} {#90}({protocol-name})" },
+    { "type": "packages", "key": "│ {#blue}󰏗  pkgs",    "format": "{rpm} rpm {#90}·{#} {flatpak-all} flatpak {#90}·{#} {snap} snap" },
+    { "type": "shell",    "key": "│ {#blue}  shell",   "format": "{pretty-name} {version}" },
+    { "type": "terminal", "key": "│ {#blue}󰄛  term",    "format": "{pretty-name} {version}" },
+    {
+      "type": "command",
+      "key": "│ {#blue}󰏘  theme",
+      "shell": "/bin/sh",
+      "text": "t=$(cat \"${XDG_STATE_HOME:-$HOME/.local/state}/desktop-theme/current\" 2>/dev/null); [ -n \"$t\" ] && echo \"$t\" | tr '-' ' ' || echo 'default'"
+    },
+    {
+      "type": "command",
+      "key": "│ {#blue}󰃭  age",
+      "shell": "/bin/sh",
+      "text": "b=$(stat -c %W /); d=$(( ($(date +%s) - b) / 86400 )); printf '%s days  \\033[90m(since %s)\\033[0m' \"$d\" \"$(date -d @$b +'%d %b %Y')\""
+    },
+    { "type": "custom", "format": "{#blue}╰───────────────────────────────────────────────" },
+
+    // ── hardware ───────────────────────────────────────────────────────
+    { "type": "custom", "format": "{#magenta}╭─ {#bold_magenta}󰌢  hardware {#magenta}────────────────────────────────" },
+    { "type": "host",    "key": "│ {#magenta}󰌢  host",    "keyColor": "magenta", "format": "{family}  {#90}{name}" },
+    { "type": "cpu",     "key": "│ {#magenta}  cpu",     "keyColor": "magenta", "temp": true,
+      "format": "{name}  {#90}{cores-logical}t · {freq-max}{?temperature} · {temperature}{?}" },
+    { "type": "gpu",     "key": "│ {#magenta}󰢮  gpu",     "keyColor": "magenta", "format": "{name}  {#90}{type}" },
+    { "type": "display", "key": "│ {#magenta}󰍹  screen",  "keyColor": "magenta",
+      "format": "{width}×{height} @ {refresh-rate} Hz  {#90}{inch}\" · {ppi} ppi · {type}" },
+    { "type": "custom", "format": "{#magenta}╰───────────────────────────────────────────────" },
+
+    // ── vitals ─────────────────────────────────────────────────────────
+    { "type": "custom", "format": "{#green}╭─ {#bold_green}󰓅  vitals {#green}──────────────────────────────────" },
+    { "type": "memory",  "key": "│ {#green}󰍛  memory",  "keyColor": "green", "format": "{percentage-bar} {percentage}  {#90}{used} / {total}" },
+    { "type": "swap",    "key": "│ {#green}󰾴  swap",    "keyColor": "green", "format": "{percentage-bar} {percentage}  {#90}{used} / {total}" },
+    { "type": "disk",    "key": "│ {#green}󰋊  disk",    "keyColor": "green", "folders": "/",
+      "format": "{size-percentage-bar} {size-percentage}  {#90}{size-used} / {size-total} {filesystem}" },
+    { "type": "battery", "key": "│ {#green}󰁹  battery", "keyColor": "green",
+      "format": "{capacity-bar} {capacity}  {#90}{status}{?time-formatted} · {time-formatted}{?}" },
+    { "type": "uptime",  "key": "│ {#green}󰅐  uptime",  "keyColor": "green", "format": "{?days}{days}d {?}{hours}h {minutes}m" },
+    { "type": "localip", "key": "│ {#green}󰩟  net",     "keyColor": "green", "format": "{ipv4}  {#90}{ifname}", "showIpv4": true, "compact": false },
+    { "type": "custom", "format": "{#green}╰───────────────────────────────────────────────" },
+
+    "break",
+    { "type": "colors", "symbol": "circle", "paddingLeft": 6 }
+  ]
+}

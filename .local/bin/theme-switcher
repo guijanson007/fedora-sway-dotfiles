@@ -264,10 +264,31 @@ def apply_nvim(p):
     src = p.dir / "neovim.lua"
     if src.exists():
         shutil.copyfile(src, dst)
-    else:
-        cs = "catppuccin-latte" if p.light else "catppuccin-mocha"
+    elif p.light:
         write(dst, 'return {\n  { "catppuccin/nvim", name = "catppuccin", priority = 1000 },\n'
-                   '  { "LazyVim/LazyVim", opts = { colorscheme = "%s" } },\n}\n' % cs)
+                   '  { "LazyVim/LazyVim", opts = { colorscheme = "catppuccin-latte" } },\n}\n')
+    else:
+        # No hand-made theme: build one from colors.toml with aether.nvim,
+        # the same way upstream Omarchy's neovim.lua.tpl does.
+        c = p.c
+        cols = {
+            "bg": p.bg, "dark_bg": p.dark_bg,
+            "darker_bg": c.get("darker_background", p.dark_bg), "lighter_bg": p.pill,
+            "fg": p.fg, "dark_fg": c.get("dark_foreground", p.muted),
+            "light_fg": p.light_fg, "bright_fg": p.bright_fg, "muted": p.muted,
+            "red": p.red, "yellow": p.yellow, "orange": p.orange, "green": p.green,
+            "cyan": p.cyan, "blue": p.blue, "magenta": p.magenta, "brown": p.brown,
+            **{"bright_" + k: p.bright(k) for k in ("red", "yellow", "green", "cyan", "blue", "magenta")},
+            "accent": p.accent, "cursor": c.get("cursor", p.bright_fg),
+            "foreground": p.fg, "background": p.bg, "selection": p.selection,
+            "selection_foreground": c.get("selection_foreground", p.bright_fg),
+            "selection_background": c.get("selection_background", p.selection),
+        }
+        body = "".join('        %s = "%s",\n' % kv for kv in cols.items())
+        write(dst, 'return {\n  {\n    "omacom/aether.nvim",\n    branch = "v3",\n'
+                   '    name = "aether",\n    priority = 1000,\n'
+                   '    opts = {\n      colors = {\n%s      },\n    },\n  },\n'
+                   '  { "LazyVim/LazyVim", opts = { colorscheme = "aether" } },\n}\n' % body)
 
 
 def vscode_exts():

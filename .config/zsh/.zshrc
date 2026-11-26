@@ -112,3 +112,4 @@ fi
 
 # User aliases and functions
 alias dot='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
+alias neofetch='fastfetch'
