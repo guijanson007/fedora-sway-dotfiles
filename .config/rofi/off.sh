@@ -18,10 +18,10 @@ texts[shutdown]="shutdown"
 
 declare -A icons
 icons[lockscreen]="\uf023"
-icons[logout]="\uf842"
-icons[suspend]="\uf9b1"
-icons[hibernate]="\uf7c9"
-icons[reboot]="\ufc07"
+icons[logout]="\U000F0343"  # nf-md-logout
+icons[suspend]="\U000F0904"  # nf-md-power_sleep
+icons[hibernate]="\U000F0717"  # nf-md-snowflake
+icons[reboot]="\U000F0709"  # nf-md-restart
 icons[shutdown]="\uf011"
 icons[cancel]="\u00d7"
 
